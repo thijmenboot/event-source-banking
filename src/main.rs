@@ -4,10 +4,28 @@ pub mod account;
 use rust_decimal::Decimal;
 use ulid::Ulid;
 
-use account::{Account, events::{AccountEvent, AccountOpenedEvent, DepositEvent, WithdrawEvent}, commands::{OpenAccountCommand, DepositCommand, WithdrawCommand} };
-use traits::{Command, Event, Aggregate};
+use account::{commands::{DepositCommand, OpenAccountCommand, WithdrawCommand}, events::{AccountEvent, AccountOpenedEvent, DepositEvent, WithdrawEvent}, repositories::AccountRepositorySqlite, Account, AccountService };
+use traits::{Aggregate, Command, Event, EventStore, Repository};
+
+struct Application {
+    account_service: AccountService<AccountRepositorySqlite, EventStoreSqlite>,
+}
+
+impl Application {
+    pub fn new() -> Self {
+        Self { account_service: AccountService::new(AccountRepositorySqlite::new("database.db"), EventStoreSqlite::new()) }
+    }
+}
 
 fn main() {
+    // TODO: write event store implementation
+    // TODO: write event handlers to store aggregates in projection database
+    // TODO: write interfaces to trigger writing and reading of aggregates
+    let app = Application::new();
+
+    app.account_service.create_account(Decimal::from(100)).expect("Failed to create account");
+
+    // DEMO 1 
     let account_id = Ulid::new();
     let history: Vec<AccountEvent> = vec![
         AccountEvent::Opened(AccountOpenedEvent {

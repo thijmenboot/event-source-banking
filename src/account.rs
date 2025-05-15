@@ -1,5 +1,9 @@
 pub mod events;
 pub mod commands;
+pub mod repositories;
+pub mod account_service;
+
+pub use account_service::AccountService;
 
 use rust_decimal::Decimal;
 use ulid::Ulid;
