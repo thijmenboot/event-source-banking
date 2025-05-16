@@ -1,8 +1,10 @@
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
 use crate::{account::Account, traits::Event};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WithdrawEvent {
     pub account_id: Ulid,
     pub amount: Decimal,
@@ -14,5 +16,13 @@ impl Event<Account> for WithdrawEvent {
             account_id: state.account_id,
             balance: state.balance - self.amount,
         })
+    }
+
+    fn aggregate_id(&self) -> Ulid {
+        self.account_id
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "account"
     }
 }

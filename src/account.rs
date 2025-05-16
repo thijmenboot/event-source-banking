@@ -6,9 +6,10 @@ pub mod account_service;
 pub use account_service::AccountService;
 
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub account_id: Option<Ulid>,
     pub balance: Decimal,

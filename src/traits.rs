@@ -3,5 +3,6 @@ pub mod command;
 pub mod event;
 pub mod repository;
 pub mod event_store;
+pub mod event_bus;
 
-pub use {command::Command, event::Event, aggregate::Aggregate, repository::Repository, event_store::EventStore};
+pub use {command::Command, event::Event, aggregate::Aggregate, repository::Repository, event_store::EventStore, event_bus::EventBus};

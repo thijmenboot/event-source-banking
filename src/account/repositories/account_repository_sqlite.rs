@@ -10,14 +10,26 @@ pub struct AccountRepositorySqlite {
 
 impl AccountRepositorySqlite {
     pub fn new(db_path: &str) -> Self {
-        Self { db: Connection::open(db_path).expect("Failed to open database") }
+        let db = Connection::open(db_path).expect("Failed to open database");
+        
+        // Apply migrations
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS accounts (
+                account_id TEXT PRIMARY KEY NOT NULL,
+                balance TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );"
+        ).expect("Failed to create accounts table");
+        
+        Self { db }
     }
 }
 
 impl Repository<Account> for AccountRepositorySqlite {
     
     fn create(&self, aggregate: Account) -> Result<(), String> {
-        let account_id = aggregate.account_id.expect("Account ID is required");
+        let account_id = aggregate.account_id.ok_or("Account ID is required")?;
         let balance = aggregate.balance;
 
         let mut statement = self.db.prepare("INSERT INTO accounts (account_id, balance) VALUES (?, ?)").expect("Failed to prepare statement");
@@ -31,7 +43,7 @@ impl Repository<Account> for AccountRepositorySqlite {
     }
     
     fn update(&self, aggregate: Account) -> Result<(), String> {
-        let account_id = aggregate.account_id.expect("Account ID is required");
+        let account_id = aggregate.account_id.ok_or("Account ID is required")?;
         let balance = aggregate.balance;
 
         let mut statement = self.db.prepare("UPDATE accounts SET balance = ? WHERE account_id = ?").expect("Failed to prepare statement");
