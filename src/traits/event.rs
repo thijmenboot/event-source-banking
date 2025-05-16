@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
@@ -6,6 +6,7 @@ use ulid::Ulid;
 pub trait Event<T> {
     fn aggregate_id(&self) -> Ulid;
     fn aggregate_type(&self) -> &str;
+    fn event_type(&self) -> &str;
     fn apply(&self, state: T) -> Result<T, String>;
 }
 
@@ -15,12 +16,14 @@ pub struct EventEnvelope<T, E: Event<T>> {
     pub aggregate_id: Ulid,
     pub aggregate_type: String,
     pub event: E,
+    pub event_type: String,
+    #[serde(skip)]
     pub _phantom: PhantomData<T>,
 }
 
 impl<T, E: Event<T>> EventEnvelope<T, E> {
-    pub fn new(sequence_number: Ulid, aggregate_id: Ulid, aggregate_type: String, event: E) -> Self {
-        Self { sequence_number, aggregate_id, aggregate_type, event, _phantom: PhantomData }
+    pub fn new(sequence_number: Ulid, aggregate_id: Ulid, aggregate_type: String, event_type: String, event: E) -> Self {
+        Self { sequence_number, aggregate_id, aggregate_type, event_type, event, _phantom: PhantomData }
     }
 
     pub fn aggregate_id(&self) -> Ulid {
@@ -37,6 +40,10 @@ impl<T, E: Event<T>> EventEnvelope<T, E> {
 
     pub fn sequence_number(&self) -> Ulid {
         self.sequence_number
+    }
+
+    pub fn event_type(&self) -> &str {
+        &self.event_type
     }
 }
 

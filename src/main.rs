@@ -7,8 +7,8 @@ use event_bus_kafka::EventBusKafka;
 use event_store_sqlite::EventStoreSqlite;
 use rust_decimal::Decimal;
 use ulid::Ulid;
-
-use account::{commands::{DepositCommand, OpenAccountCommand, WithdrawCommand}, events::{AccountEvent, AccountOpenedEvent, DepositEvent, WithdrawEvent}, repositories::AccountRepositorySqlite, Account, AccountService };
+use std::thread;
+use account::{commands::{DepositCommand, OpenAccountCommand, WithdrawCommand}, events::{AccountEvent, AccountOpenedEvent, DepositEvent, WithdrawEvent}, repositories::AccountRepositorySqlite, Account, AccountHandler, AccountService };
 use traits::{Aggregate, Command, Event, EventStore, Repository};
 
 struct Config {
@@ -23,34 +23,41 @@ impl Config {
     }
 }
 
-struct Application {
-    account_service: AccountService<AccountRepositorySqlite, EventStoreSqlite, EventBusKafka>,
-}
-
-impl Application {
-    pub fn new(config: Config) -> Self {
-        Self { account_service: AccountService::new(AccountRepositorySqlite::new(&config.projection_database_path), EventStoreSqlite::new(&config.event_store_path), EventBusKafka::new(&config.kafka_bootstrap_servers)) }
-    }
-}
-
 fn main() {
-    // TODO: write event store implementation [x]
-    // TODO: write event bus implementation [subscriber todo]
-    // TODO: write event handlers to store aggregates in projection database
-    // TODO: write migrations for databases [x]
-    // TODO: write interfaces to trigger writing and reading of aggregates
-    // TODO: make simple front-end (tech stack to be determined)
-    let app = Application::new(Config::new(
+    // TODO: BALANCE NOT BEING CALCULATED CORRECTLY: IS 100 SHOULD BE 200
+    // TODO: on startup have repositories seed projections with data from event store []
+    // TODO: write interfaces to trigger writing and reading of aggregates []
+    // TODO: make simple front-end (tech stack to be determined) []
+    let config = Config::new(
         "data.db".to_string(),
         "data.db".to_string(),
         "localhost:9092".to_string(),
-    ));
+    );
+
+    // construct necessary components
+    let event_store = EventStoreSqlite::new(&config.event_store_path);
+    let event_bus = EventBusKafka::new(&config.kafka_bootstrap_servers);
+
+    // account components
+    let account_repository = AccountRepositorySqlite::new(&config.projection_database_path);
+    let account_service = AccountService::new(account_repository.clone(), event_store.clone(), event_bus.clone());
+    let account_handler = AccountHandler::new(account_repository.clone(), event_bus.clone(), event_store.clone());
+
+    // start application
+    thread::spawn(move || {
+        account_handler.listen();
+    });
 
     // create account
-    let account = app.account_service.create_account(Decimal::from(100)).expect("Failed to create account");
+    let account = account_service.create_account(Decimal::from(100)).expect("Failed to create account");
     let account_id = account.account_id.ok_or("Failed to get account id".to_string()).unwrap();
 
     // deposit 100 into the account
-    app.account_service.deposit(account_id, Decimal::from(100)).expect("Failed to deposit");
+    account_service.deposit(account_id, Decimal::from(100)).expect("Failed to deposit");
 
+    // Keep the main thread alive to prevent the application from exiting
+    println!("Application started. Listening for events...");
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }

@@ -12,11 +12,14 @@ use crate::{traits::Event, Account};
 
 // Define this where you have your event types
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum AccountEvent {
     Opened(AccountOpenedEvent),
     Deposited(DepositEvent),
     Withdrawn(WithdrawEvent),
 }
+
+pub const ACCOUNT_AGGREGATE_TYPE: &str = "account";
 
 impl Event<Account> for AccountEvent {
     fn apply(&self, state: Account) -> Result<Account, String> {
@@ -36,10 +39,14 @@ impl Event<Account> for AccountEvent {
     }
 
     fn aggregate_type(&self) -> &str {
+        ACCOUNT_AGGREGATE_TYPE
+    }
+
+    fn event_type(&self) -> &str {
         match self {
-            AccountEvent::Opened(e) => e.aggregate_type(),
-            AccountEvent::Deposited(e) => e.aggregate_type(),
-            AccountEvent::Withdrawn(e) => e.aggregate_type(),
+            AccountEvent::Opened(e) => e.event_type(),
+            AccountEvent::Deposited(e) => e.event_type(),
+            AccountEvent::Withdrawn(e) => e.event_type(),
         }
     }
 }

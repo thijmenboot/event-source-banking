@@ -1,19 +1,22 @@
-use rusqlite::Connection;
 use rusqlite::named_params;
 use std::str::FromStr;
-
 use crate::{account::Account, traits::Repository};
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 
+#[derive(Debug, Clone)]
 pub struct AccountRepositorySqlite {
-    db: Connection,
+    pool: Pool<SqliteConnectionManager>,
 }
 
 impl AccountRepositorySqlite {
     pub fn new(db_path: &str) -> Self {
-        let db = Connection::open(db_path).expect("Failed to open database");
+        let manager = SqliteConnectionManager::file(db_path);
+        let pool = Pool::new(manager).expect("Failed to create pool");
         
         // Apply migrations
-        db.execute_batch(
+        let conn = pool.get().expect("Failed to get connection");
+        conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS accounts (
                 account_id TEXT PRIMARY KEY NOT NULL,
                 balance TEXT NOT NULL,
@@ -22,7 +25,7 @@ impl AccountRepositorySqlite {
             );"
         ).expect("Failed to create accounts table");
         
-        Self { db }
+        Self { pool }
     }
 }
 
@@ -32,12 +35,16 @@ impl Repository<Account> for AccountRepositorySqlite {
         let account_id = aggregate.account_id.ok_or("Account ID is required")?;
         let balance = aggregate.balance;
 
-        let mut statement = self.db.prepare("INSERT INTO accounts (account_id, balance) VALUES (?, ?)").expect("Failed to prepare statement");
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let mut statement = conn.prepare("INSERT INTO accounts (account_id, balance) VALUES (:account_id, :balance)")
+            .map_err(|e| e.to_string())?;
         
         statement.execute(named_params! {
-            ":id": account_id.to_string(),
+            ":account_id": account_id.to_string(),
             ":balance": balance.to_string(),
-        }).expect("Failed to execute statement");
+        }).map_err(|e| e.to_string())?;
+
+        println!("Account created in projection: {:?}", account_id);
 
         Ok(())
     }
@@ -46,32 +53,41 @@ impl Repository<Account> for AccountRepositorySqlite {
         let account_id = aggregate.account_id.ok_or("Account ID is required")?;
         let balance = aggregate.balance;
 
-        let mut statement = self.db.prepare("UPDATE accounts SET balance = ? WHERE account_id = ?").expect("Failed to prepare statement");
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let mut statement = conn.prepare("UPDATE accounts SET balance = :balance WHERE account_id = :account_id")
+            .map_err(|e| e.to_string())?;
         
         statement.execute(named_params! {
-            ":id": account_id.to_string(),
+            ":account_id": account_id.to_string(),
             ":balance": balance.to_string(),
-        }).expect("Failed to execute statement");
+        }).map_err(|e| e.to_string())?;
+
+        println!("Account ID {:?} balance updated in projection: {:?}", account_id, balance);
 
         Ok(())
     }
     
     fn delete(&self, id: ulid::Ulid) -> Result<(), String> {
-        let mut statement = self.db.prepare("DELETE FROM accounts WHERE account_id = ?").expect("Failed to prepare statement");
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let mut statement = conn.prepare("DELETE FROM accounts WHERE account_id = :account_id")
+            .map_err(|e| e.to_string())?;
         
         statement.execute(named_params! {
-            ":id": id.to_string(),
-        }).expect("Failed to execute statement");
+            ":account_id": id.to_string(),
+        }).map_err(|e| e.to_string())?;
+
+        println!("Account ID {:?} deleted from projection", id);
 
         Ok(())
     }
     
     fn get(&self, id: ulid::Ulid) -> Result<Account, String> {
-        let mut statement = self.db.prepare("SELECT account_id, balance FROM accounts WHERE account_id = :id")
-            .expect("Failed to prepare statement");
+        let conn = self.pool.get().map_err(|e| e.to_string())?;
+        let mut statement = conn.prepare("SELECT account_id, balance FROM accounts WHERE account_id = :account_id")
+            .map_err(|e| e.to_string())?;
         
         let account = statement.query_row(named_params! {
-            ":id": id.to_string()
+            ":account_id": id.to_string()
         }, |row| {
             let account_id = row.get::<_, String>(0)
                 .and_then(|s| ulid::Ulid::from_string(&s).map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))))
@@ -85,7 +101,7 @@ impl Repository<Account> for AccountRepositorySqlite {
                 account_id: Some(account_id),
                 balance,
             })
-        }).expect("Failed to query row");
+        }).map_err(|e| e.to_string())?;
 
         Ok(account)
     }

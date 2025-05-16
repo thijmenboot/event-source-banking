@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.28.0"
 rdkafka = "0.37.0"
 rusqlite = { version = "0.35.0", feature = ["serde"] }
 rust_decimal = "1.37.1"

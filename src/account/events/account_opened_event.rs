@@ -26,4 +26,8 @@ impl Event<Account> for AccountOpenedEvent {
     fn aggregate_type(&self) -> &str {
         "account"
     }
+
+    fn event_type(&self) -> &str {
+        "account_opened"
+    }
 }

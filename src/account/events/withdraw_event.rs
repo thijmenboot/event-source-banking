@@ -12,9 +12,15 @@ pub struct WithdrawEvent {
 
 impl Event<Account> for WithdrawEvent {
     fn apply(&self, state: Account) -> Result<Account, String> {
+        let new_balance = state.balance - self.amount;
+
+        if new_balance < Decimal::from(0) {
+            return Err("Insufficient balance".to_string());
+        }
+
         Ok(Account {
             account_id: state.account_id,
-            balance: state.balance - self.amount,
+            balance: new_balance,
         })
     }
 
@@ -24,5 +30,9 @@ impl Event<Account> for WithdrawEvent {
 
     fn aggregate_type(&self) -> &str {
         "account"
+    }
+
+    fn event_type(&self) -> &str {
+        "withdraw"
     }
 }

@@ -8,9 +8,9 @@ pub struct DepositCommand {
 }
 
 impl Command<Account, DepositEvent> for DepositCommand {
-    fn execute(&self, _: Account) -> Result<Vec<DepositEvent>, String> {
+    fn execute(&self, account: Account) -> Result<Vec<DepositEvent>, String> {
         Ok(vec![DepositEvent {
-            account_id: Ulid::new(),
+            account_id: account.account_id.ok_or("Account ID is required")?,
             amount: self.amount,
         }])
     }

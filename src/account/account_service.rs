@@ -7,6 +7,7 @@ use crate::traits::{Aggregate, Command, Event, EventBus, EventStore, Repository}
 use crate::account::events::AccountEvent;
 
 use super::commands::{DepositCommand, OpenAccountCommand, WithdrawCommand};
+use super::events::{ACCOUNT_AGGREGATE_TYPE};
 
 pub struct AccountService<R: Repository<Account>, E: EventStore, B: EventBus> {
     repository: R, // reading
@@ -32,7 +33,7 @@ impl<R: Repository<Account>, E: EventStore, B: EventBus> AccountService<R, E, B>
             account = event.apply(account)?;
 
             // append event to the event store to save history and state
-            self.event_store.append_event(account.account_id.ok_or("Account ID is required")?, "Account".to_string(), event.clone())?;
+            self.event_store.append_event(account.account_id.ok_or("Account ID is required")?, ACCOUNT_AGGREGATE_TYPE, event.clone())?;
 
             // publish event for other services and projections to consume
             self.event_bus.produce_event(event)?;
@@ -42,7 +43,7 @@ impl<R: Repository<Account>, E: EventStore, B: EventBus> AccountService<R, E, B>
     }
 
     pub fn deposit(&self, account_id: Ulid, amount: Decimal) -> Result<(), String> {
-        let events = self.event_store.get_events_for_aggregate(account_id, "Account".to_string())?;
+        let events = self.event_store.get_events_for_aggregate(account_id, ACCOUNT_AGGREGATE_TYPE)?;
         let mut account = Account::from_history::<AccountEvent>(events.into_iter().map(|e| e.event).collect())?;
 
         let command = DepositCommand {
@@ -55,7 +56,7 @@ impl<R: Repository<Account>, E: EventStore, B: EventBus> AccountService<R, E, B>
             account = event.apply(account)?;
 
             // append event to the event store to save history and state
-            self.event_store.append_event(account.account_id.ok_or("Account ID is required")?, "Account".to_string(), event.clone())?;
+            self.event_store.append_event(account.account_id.ok_or("Account ID is required")?, ACCOUNT_AGGREGATE_TYPE, event.clone())?;
 
             // publish event for other services and projections to consume
             self.event_bus.produce_event(event)?;
@@ -65,7 +66,7 @@ impl<R: Repository<Account>, E: EventStore, B: EventBus> AccountService<R, E, B>
     }
 
     pub fn withdraw(&self, account_id: Ulid, amount: Decimal) -> Result<(), String> {
-        let events = self.event_store.get_events_for_aggregate(account_id, "Account".to_string())?;
+        let events = self.event_store.get_events_for_aggregate(account_id, ACCOUNT_AGGREGATE_TYPE)?;
         let mut account = Account::from_history::<AccountEvent>(events.into_iter().map(|e| e.event).collect())?;
 
         let command = WithdrawCommand {
@@ -78,7 +79,7 @@ impl<R: Repository<Account>, E: EventStore, B: EventBus> AccountService<R, E, B>
             account = event.apply(account)?;
 
             // append event to the event store to save history and state
-            self.event_store.append_event(account.account_id.ok_or("Account ID is required")?, "Account".to_string(), event.clone())?;
+            self.event_store.append_event(account.account_id.ok_or("Account ID is required")?, ACCOUNT_AGGREGATE_TYPE, event.clone())?;
 
             // publish event for other services and projections to consume
             self.event_bus.produce_event(event)?;
