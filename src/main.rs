@@ -13,13 +13,14 @@ struct Application {
 
 impl Application {
     pub fn new() -> Self {
-        Self { account_service: AccountService::new(AccountRepositorySqlite::new("database.db"), EventStoreSqlite::new()) }
+        Self { account_service: AccountService::new(AccountRepositorySqlite::new("projection.db"), EventStoreSqlite::new()) }
     }
 }
 
 fn main() {
     // TODO: write event store implementation
     // TODO: write event handlers to store aggregates in projection database
+    // TODO: write migrations for databases
     // TODO: write interfaces to trigger writing and reading of aggregates
     let app = Application::new();
 
