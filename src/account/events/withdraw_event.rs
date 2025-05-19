@@ -2,7 +2,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
-use crate::{account::Account, traits::Event};
+use crate::{account::Account, traits::Event, traits::event::ApplyError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WithdrawEvent {
@@ -11,17 +11,17 @@ pub struct WithdrawEvent {
 }
 
 impl Event<Account> for WithdrawEvent {
-    fn apply(&self, state: Account) -> Result<Account, String> {
+    fn apply(&self, state: &mut Account) -> Result<(), ApplyError> {
         let new_balance = state.balance - self.amount;
 
         if new_balance < Decimal::from(0) {
-            return Err("Insufficient balance".to_string());
+            return Err(ApplyError::InvariantViolated(
+                "Insufficient balance".to_string(),
+            ));
         }
+        state.balance = new_balance;
 
-        Ok(Account {
-            account_id: state.account_id,
-            balance: new_balance,
-        })
+        Ok(())
     }
 
     fn aggregate_id(&self) -> Ulid {

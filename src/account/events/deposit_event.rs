@@ -2,7 +2,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 
-use crate::{account::Account, traits::Event};
+use crate::{account::Account, traits::Event, traits::event::ApplyError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositEvent {
@@ -11,13 +11,10 @@ pub struct DepositEvent {
 }
 
 impl Event<Account> for DepositEvent {
-    fn apply(&self, state: Account) -> Result<Account, String> {
+    fn apply(&self, state: &mut Account) -> Result<(), ApplyError> {
         let new_balance = state.balance + self.amount;
-
-        Ok(Account {
-            account_id: state.account_id,
-            balance: new_balance,
-        })
+        state.balance = new_balance;
+        Ok(())
     }
 
     fn aggregate_id(&self) -> Ulid {

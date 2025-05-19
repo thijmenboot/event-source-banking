@@ -1,12 +1,13 @@
-use rdkafka::config::ClientConfig;
-use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
-use rdkafka::consumer::{BaseConsumer, Consumer};
+use crate::traits::event_bus::EventBusError;
+use crate::traits::{Event, EventBus, event::EventEnvelope};
 use rdkafka::Message;
-use ulid::Ulid;
+use rdkafka::config::ClientConfig;
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::producer::{BaseProducer, BaseRecord};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::sync::Arc;
-use crate::traits::{event::EventEnvelope, Event, EventBus};
+use std::time::Duration;
+use ulid::Ulid;
 
 #[derive(Clone)]
 pub struct EventBusKafka {
@@ -26,24 +27,35 @@ impl EventBusKafka {
             .expect("Failed to create producer");
 
         let consumer: BaseConsumer = ClientConfig::new()
-            .set("bootstrap.servers", bootstrap_servers)  // Should match producer config
+            .set("bootstrap.servers", bootstrap_servers) // Should match producer config
             .set("group.id", consumer_group)
             .set("enable.auto.commit", "true")
             .set("auto.offset.reset", "earliest") // Process existing messages only once per consumer group
             .create()
             .expect("Failed to create consumer");
 
-        consumer.subscribe(&["events"])
+        consumer
+            .subscribe(&["events"])
             .expect("Failed to subscribe to topic");
-        
-        Self { producer: Arc::new(producer), consumer: Arc::new(consumer) }
+
+        Self {
+            producer: Arc::new(producer),
+            consumer: Arc::new(consumer),
+        }
     }
 }
 
 impl EventBus for EventBusKafka {
-    fn produce_event<T, E: Event<T> + Serialize>(&self, event: E) -> Result<(), String> {
-        let envelope = EventEnvelope::new(Ulid::new(), event.aggregate_id(), event.aggregate_type().to_string(), event.event_type().to_string(), event);
-        let envelope_json = serde_json::to_string(&envelope).map_err(|e| format!("Failed to serialize event: {}", e))?;
+    fn produce_event<T, E: Event<T> + Serialize>(&self, event: E) -> Result<(), EventBusError> {
+        let envelope = EventEnvelope::new(
+            Ulid::new(),
+            event.aggregate_id(),
+            event.aggregate_type().to_string(),
+            event.event_type().to_string(),
+            event,
+        );
+        let envelope_json =
+            serde_json::to_string(&envelope).map_err(EventBusError::SerialisationError)?;
 
         self.producer
             .send(
@@ -51,18 +63,21 @@ impl EventBus for EventBusKafka {
                     .payload(&envelope_json)
                     .key(&envelope.aggregate_id.to_string()),
             )
-            .map_err(|(err, _)| format!("Failed to send event: {}", err))?;
+            .map_err(|(e, _)| EventBusError::ProduceError(e.to_string()))?;
 
         Ok(())
     }
 
-    fn subscribe<T, E>(&self, aggregate_type: &str, handler: Box<dyn Fn(E) -> Result<(), String> + Send + Sync + 'static>) 
-    where 
-        E: Event<T> + for<'de> Deserialize<'de> + 'static 
+    fn subscribe<T, E>(
+        &self,
+        aggregate_type: &str,
+        handler: Box<dyn Fn(E) -> Result<(), EventBusError> + Send + Sync + 'static>,
+    ) where
+        E: Event<T> + for<'de> Deserialize<'de> + 'static,
     {
         let aggregate_type = aggregate_type.to_string();
-        let consumer = self.consumer.clone();  // Clone the Arc<BaseConsumer>
-                
+        let consumer = self.consumer.clone(); // Clone the Arc<BaseConsumer>
+
         std::thread::spawn(move || {
             loop {
                 match consumer.poll(Duration::from_millis(50)) {
@@ -77,7 +92,7 @@ impl EventBus for EventBusKafka {
                                                 eprintln!("Error handling event: {}", e);
                                             }
                                         }
-                                    },
+                                    }
                                     Err(e) => eprintln!("Failed to deserialize: {}", e),
                                 }
                             }

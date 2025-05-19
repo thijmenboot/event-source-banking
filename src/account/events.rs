@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use ulid::Ulid;
 pub use withdraw_event::WithdrawEvent;
 
-use crate::{traits::Event, Account};
+use crate::{Account, traits::Event, traits::event::ApplyError};
 
 // Define this where you have your event types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +22,7 @@ pub enum AccountEvent {
 pub const ACCOUNT_AGGREGATE_TYPE: &str = "account";
 
 impl Event<Account> for AccountEvent {
-    fn apply(&self, state: Account) -> Result<Account, String> {
+    fn apply(&self, state: &mut Account) -> Result<(), ApplyError> {
         match self {
             AccountEvent::Opened(e) => e.apply(state),
             AccountEvent::Deposited(e) => e.apply(state),

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use ulid::Ulid;
 
-use crate::{account::Account, traits::Event};
+use crate::{account::Account, traits::Event, traits::event::ApplyError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountOpenedEvent {
@@ -12,11 +12,10 @@ pub struct AccountOpenedEvent {
 }
 
 impl Event<Account> for AccountOpenedEvent {
-    fn apply(&self, _: Account) -> Result<Account, String> {
-        Ok(Account {
-            account_id: Some(self.account_id),
-            balance: self.balance,
-        })
+    fn apply(&self, account: &mut Account) -> Result<(), ApplyError> {
+        account.account_id = Some(self.account_id);
+        account.balance = self.balance;
+        Ok(())
     }
 
     fn aggregate_id(&self) -> Ulid {
